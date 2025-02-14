@@ -75,11 +75,6 @@ void CForagingNNQTUserFunctions::DrawNest() {
       loopFunctions.NestRadius,
       0.01f,
       CColor::GRAY80);
-   DrawCircle(
-      nest_3d,
-      CQuaternion(),
-      loopFunctions.NestRadius,
-      CColor::GRAY50);
 }
 
 /****************************************/

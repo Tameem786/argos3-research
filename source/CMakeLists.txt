@@ -5,6 +5,8 @@ add_library(foraging_nn_controller     SHARED foraging_nn_controller.h
                                     foraging_nn_controller.cpp
                                     foraging_nn_loop_functions.h
                                     foraging_nn_loop_functions.cpp
+                                    foraging_nn_pheromone.h
+                                    foraging_nn_pheromone.cpp
                                     )
 
 add_library(foraging_nn_loop_functions SHARED foraging_nn_loop_functions.h
@@ -13,6 +15,8 @@ add_library(foraging_nn_loop_functions SHARED foraging_nn_loop_functions.h
                                     foraging_nn_controller.cpp
                                     foraging_nn_qt_user_functions.h
                                     foraging_nn_qt_user_functions.cpp
+                                    foraging_nn_pheromone.h
+                                    foraging_nn_pheromone.cpp
                                     )
 
 # add_library(BasicGA SHARED          nn/Perceptron.cpp

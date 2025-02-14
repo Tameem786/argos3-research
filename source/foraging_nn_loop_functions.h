@@ -6,9 +6,14 @@
 #include <argos3/core/utility/math/range.h>
 #include <argos3/core/utility/math/rng.h>
 #include <vector>
+#include <foraging_nn_pheromone.h>
+#include <foraging_nn_controller.h>
 
 using namespace argos;
 using namespace std;
+
+class foraging_nn_pheromone;
+class foraging_nn_controller;
 
 class CForagingNNLoopFunctions : public CLoopFunctions {
 
@@ -20,15 +25,15 @@ public:
    virtual void Init(TConfigurationNode& t_tree);
    virtual void Reset();
    virtual void Destroy();
-   virtual CColor GetFloorColor(const CVector2& c_position_on_plane);
    virtual void PreStep();
    // virtual void PostStep();
    virtual void PostExperiment();
    // vector<CVector2> GetFoodList() { return FoodList; }
-   vector<CColor> GetFoodColoringList() { return FoodColoringList; }
+   // vector<CColor> GetFoodColoringList() { return FoodColoringList; }
    void SetFoodList();
    CVector2 NestPosition;
    CVector2 FoodPosition;
+   vector<foraging_nn_pheromone> Pheromones;
    Real NestRadius;
    Real FoodRadius;
    bool isFoodCollected;
@@ -45,6 +50,8 @@ public:
 
    vector<SFoodData> FoodList;
    void SetInitialFoodPositions();
+   void UpdatePheromoneList();
+   size_t SimTime;
 protected:
    vector<CColor> FoodColoringList;
 

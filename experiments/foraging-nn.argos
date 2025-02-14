@@ -88,6 +88,7 @@
         <footbot_light implementation="rot_z_only" show_rays="false" />
         <footbot_motor_ground implementation="rot_z_only" />
         <range_and_bearing implementation="medium" medium="rab" />
+        <positioning          implementation = "default"/>
       </sensors>
       <!--
           The <params> section is passed as-is to the controller's Init()
@@ -104,16 +105,8 @@
                        soft_turn_angle_threshold="70"
                        no_turn_angle_threshold="10"
                        max_speed="10" />
-        <state initial_rest_to_explore_prob="0.1"
-               initial_explore_to_rest_prob="0.1"
-               food_rule_explore_to_rest_delta_prob="0.01"
-               food_rule_rest_to_explore_delta_prob="0.01"
-               collision_rule_explore_to_rest_delta_prob="0.01"
-               social_rule_explore_to_rest_delta_prob="0.01"
-               social_rule_rest_to_explore_delta_prob="0.01"
-               minimum_resting_time="50"
-               minimum_unsuccessful_explore_time="600"
-               minimum_search_for_place_in_nest_time="50">
+        <state minimum_resting_time="50"
+               minimum_resting_time_near_food="100">
           <food_rule active="true" food_rule_explore_to_rest_delta_prob="0.01" />
         </state>
       </params>
@@ -193,7 +186,7 @@
     <distribute>
       <position method="uniform" min="-0.2,-0.2,0" max="0.2,0.2,0" />
       <orientation method="uniform" min="0,0,0" max="360,0,0" />
-      <entity quantity="5" max_trials="100">
+      <entity quantity="2" max_trials="100">
         <foot-bot id="fb">
           <controller config="ffc" />
         </foot-bot>

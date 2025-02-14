@@ -13,6 +13,7 @@ CForagingNNLoopFunctions::CForagingNNLoopFunctions() :
    m_pcFloor(NULL),
    m_pcRNG(NULL),
    m_unCollectedFood(0),
+   SimTime(0),
    m_nEnergy(0),
    m_unEnergyPerFoodItem(1),
    m_unEnergyPerWalkingRobot(1) {
@@ -61,6 +62,14 @@ void CForagingNNLoopFunctions::Init(TConfigurationNode& t_node) {
    NestRadius = 0.35f;
    FoodRadius = 0.1f;
    isFoodCollected = false;
+
+   CSpace::TMapPerType& footbots = GetSpace().GetEntitiesByType("foot-bot");
+   CSpace::TMapPerType::iterator it;
+   for(it = footbots.begin(); it != footbots.end(); it++) {
+      CFootBotEntity& footBot = *any_cast<CFootBotEntity*>(it->second);
+      CForagingNNController& c = (CForagingNNController&)(footBot.GetControllableEntity().GetController());
+      c.SetLoopFunctions(this);
+   }
    SetInitialFoodPositions();
 }
 
@@ -91,17 +100,9 @@ void CForagingNNLoopFunctions::SetInitialFoodPositions() {
    }
 }
 
-CColor CForagingNNLoopFunctions::GetFloorColor(const CVector2& c_position_on_plane) {
-   if(c_position_on_plane.SquareLength() < NestRadius*NestRadius) {
-      return CColor::GRAY50;
-   }
-   else {
-      return CColor::WHITE;
-   }
-}
-
 void CForagingNNLoopFunctions::Reset() {
    /* Zero the counters */
+   SimTime = 0;
    m_unCollectedFood = 0;
    m_nEnergy = 0;
    /* Close the file */
@@ -115,7 +116,31 @@ void CForagingNNLoopFunctions::Reset() {
    //                      m_pcRNG->Uniform(m_cForagingArenaSideY));
    // }
    isFoodCollected = false;
+   // Pheromones.clear();
    SetInitialFoodPositions();
+}
+
+void CForagingNNLoopFunctions::UpdatePheromoneList() {
+ 
+   //LOG << "Hello, world! " << PheromoneList.size() << endl << endl;
+
+   vector<foraging_nn_pheromone> new_p_list;
+
+   for(size_t i = 0; i < Pheromones.size(); i++) {
+
+       Pheromones[i].Update((Real)(SimTime / 10));
+
+       //if(PheromoneList[i].IsActive()) LOG << "O" << endl;
+       //else LOG << "X" << endl;
+
+       if(Pheromones[i].IsActive() == true) {
+           new_p_list.push_back(Pheromones[i]);
+       }
+   }
+
+   //LOG << endl;
+
+   Pheromones = new_p_list;
 }
 
 /****************************************/
@@ -146,6 +171,9 @@ void CForagingNNLoopFunctions::PreStep() {
     * If a robot is on a food item, pick it
     * Each robot can carry only one food item per time
     */
+   SimTime++;
+   // UpdatePheromoneList();
+
    UInt32 unWalkingFBs = 0;
    UInt32 unRestingFBs = 0;
    /* Check whether a robot is on a food item */
@@ -191,6 +219,10 @@ void CForagingNNLoopFunctions::PreStep() {
          }
       }
    }
+
+   // if(FoodList.size() == 0) {
+   //    Pheromones.clear();
+   // }
 
    /* Update energy expediture due to walking robots */
    m_nEnergy -= unWalkingFBs * m_unEnergyPerWalkingRobot;

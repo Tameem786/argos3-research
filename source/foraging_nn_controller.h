@@ -30,13 +30,17 @@
  /* Definition of the foot-bot motor ground sensor */
  #include <argos3/plugins/robots/foot-bot/control_interface/ci_footbot_motor_ground_sensor.h>
  /* Definitions for random number generation */
+ #include <argos3/plugins/robots/generic/control_interface/ci_positioning_sensor.h>
  #include <argos3/core/utility/math/rng.h>
+ #include <foraging_nn_loop_functions.h>
  
  /*
   * All the ARGoS stuff in the 'argos' namespace.
   * With this statement, you save typing argos:: every time.
   */
  using namespace argos;
+
+ class CForagingNNLoopFunctions;
  
  /*
   * A controller is simply an implementation of the CCI_Controller class.
@@ -122,7 +126,8 @@
        enum EState {
           STATE_RESTING = 0,
           STATE_EXPLORING,
-          STATE_RETURN_TO_NEST
+          STATE_RETURN_TO_NEST,
+          STATE_RESTING_NEAR_FOOD
        } State;
  
        /* True when the robot is in the nest */
@@ -151,8 +156,10 @@
        /* The minimum number of steps in resting state before the robots
           starts thinking that it's time to move */
        size_t MinimumRestingTime;
+       size_t MinimumRestingTimeNearFood;
        /* The number of steps in resting state */
        size_t TimeRested;
+       size_t TimeRestedNearFood;
        /* The number of exploration steps without finding food after which
           a foot-bot starts thinking about going back to the nest */
        size_t MinimumUnsuccessfulExploreTime;
@@ -208,6 +215,8 @@
      * completeness.
      */
     virtual void Destroy() {}
+
+    void SetLoopFunctions(CForagingNNLoopFunctions* lf) { loopFunctions = lf; }
  
     /*
      * Returns true if the robot is currently exploring.
@@ -222,6 +231,10 @@
     inline bool IsResting() const {
        return m_sStateData.State == SStateData::STATE_RESTING;
     }
+
+    inline bool IsRestingNearFood() const {
+      return m_sStateData.State == SStateData::STATE_RESTING_NEAR_FOOD;
+   }
  
     /*
      * Returns true if the robot is currently returning to the nest.
@@ -236,7 +249,15 @@
     inline SFoodData& GetFoodData() {
        return m_sFoodData;
     }
- 
+
+    inline CCI_RangeAndBearingActuator* GetRABA() {
+      return m_pcRABA;
+    }
+
+    inline CCI_RangeAndBearingSensor* GetRABS() {
+      return m_pcRABS;
+    }
+
  private:
  
     /*
@@ -272,6 +293,7 @@
      * Executes the resting state.
      */
     void Rest();
+    void RestNearFood();
  
     /*
      * Executes the exploring state.
@@ -282,6 +304,10 @@
      * Executes the return to nest state.
      */
     void ReturnToNest();
+
+    void layPheromone();
+
+    CVector2 GetPosition();
  
  private:
  
@@ -299,6 +325,7 @@
     CCI_FootBotLightSensor* m_pcLight;
     /* Pointer to the foot-bot motor ground sensor */
     CCI_FootBotMotorGroundSensor* m_pcGround;
+    CCI_PositioningSensor* compass;
  
     /* The random number generator */
     CRandom::CRNG* m_pcRNG;
@@ -319,6 +346,8 @@
     SDiffusionParams m_sDiffusionParams;
     /* The food data */
     SFoodData m_sFoodData;
+
+    CForagingNNLoopFunctions* loopFunctions;
  
  };
  

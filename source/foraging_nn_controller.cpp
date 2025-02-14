@@ -68,16 +68,17 @@ CForagingNNController::SStateData::SStateData() :
 
 void CForagingNNController::SStateData::Init(TConfigurationNode& t_node) {
    try {
-      GetNodeAttribute(t_node, "initial_rest_to_explore_prob", InitialRestToExploreProb);
-      GetNodeAttribute(t_node, "initial_explore_to_rest_prob", InitialExploreToRestProb);
-      GetNodeAttribute(t_node, "food_rule_explore_to_rest_delta_prob", FoodRuleExploreToRestDeltaProb);
-      GetNodeAttribute(t_node, "food_rule_rest_to_explore_delta_prob", FoodRuleRestToExploreDeltaProb);
-      GetNodeAttribute(t_node, "collision_rule_explore_to_rest_delta_prob", CollisionRuleExploreToRestDeltaProb);
-      GetNodeAttribute(t_node, "social_rule_rest_to_explore_delta_prob", SocialRuleRestToExploreDeltaProb);
-      GetNodeAttribute(t_node, "social_rule_explore_to_rest_delta_prob", SocialRuleExploreToRestDeltaProb);
+      // GetNodeAttribute(t_node, "initial_rest_to_explore_prob", InitialRestToExploreProb);
+      // GetNodeAttribute(t_node, "initial_explore_to_rest_prob", InitialExploreToRestProb);
+      // GetNodeAttribute(t_node, "food_rule_explore_to_rest_delta_prob", FoodRuleExploreToRestDeltaProb);
+      // GetNodeAttribute(t_node, "food_rule_rest_to_explore_delta_prob", FoodRuleRestToExploreDeltaProb);
+      // GetNodeAttribute(t_node, "collision_rule_explore_to_rest_delta_prob", CollisionRuleExploreToRestDeltaProb);
+      // GetNodeAttribute(t_node, "social_rule_rest_to_explore_delta_prob", SocialRuleRestToExploreDeltaProb);
+      // GetNodeAttribute(t_node, "social_rule_explore_to_rest_delta_prob", SocialRuleExploreToRestDeltaProb);
       GetNodeAttribute(t_node, "minimum_resting_time", MinimumRestingTime);
-      GetNodeAttribute(t_node, "minimum_unsuccessful_explore_time", MinimumUnsuccessfulExploreTime);
-      GetNodeAttribute(t_node, "minimum_search_for_place_in_nest_time", MinimumSearchForPlaceInNestTime);
+      GetNodeAttribute(t_node, "minimum_resting_time_near_food", MinimumRestingTimeNearFood);
+      // GetNodeAttribute(t_node, "minimum_unsuccessful_explore_time", MinimumUnsuccessfulExploreTime);
+      // GetNodeAttribute(t_node, "minimum_search_for_place_in_nest_time", MinimumSearchForPlaceInNestTime);
 
    }
    catch(CARGoSException& ex) {
@@ -88,22 +89,25 @@ void CForagingNNController::SStateData::Init(TConfigurationNode& t_node) {
 void CForagingNNController::SStateData::Reset() {
    State = STATE_RESTING;
    InNest = true;
-   RestToExploreProb = InitialRestToExploreProb;
-   ExploreToRestProb = InitialExploreToRestProb;
-   TimeExploringUnsuccessfully = 0;
+   // RestToExploreProb = InitialRestToExploreProb;
+   // ExploreToRestProb = InitialExploreToRestProb;
+   // TimeExploringUnsuccessfully = 0;
    /* Initially the robot is resting, and by setting RestingTime to
       MinimumRestingTime we force the robots to make a decision at the
       experiment start. If instead we set RestingTime to zero, we would
       have to wait till RestingTime reaches MinimumRestingTime before
       something happens, which is just a waste of time. */
-   TimeRested = MinimumRestingTime;
-   TimeSearchingForPlaceInNest = 0;
+   TimeRested = 0;
+   TimeRestedNearFood = 0;
+   // TimeSearchingForPlaceInNest = 0;
 }
 
 /****************************************/
 /****************************************/
 
 CForagingNNController::CForagingNNController() :
+   loopFunctions(NULL),
+   compass(NULL),
    m_pcWheels(NULL),
    m_pcLEDs(NULL),
    m_pcRABA(NULL),
@@ -128,6 +132,7 @@ void CForagingNNController::Init(TConfigurationNode& t_node) {
       m_pcProximity = GetSensor  <CCI_FootBotProximitySensor      >("footbot_proximity"    );
       m_pcLight     = GetSensor  <CCI_FootBotLightSensor          >("footbot_light"        );
       m_pcGround    = GetSensor  <CCI_FootBotMotorGroundSensor    >("footbot_motor_ground" );
+      compass       = GetSensor  <CCI_PositioningSensor           >("positioning");
       /*
        * Parse XML parameters
        */
@@ -154,9 +159,14 @@ void CForagingNNController::Init(TConfigurationNode& t_node) {
 /****************************************/
 
 void CForagingNNController::ControlStep() {
+   LOG << GetId() << " Position: " << GetPosition() << std::endl;
    switch(m_sStateData.State) {
       case SStateData::STATE_RESTING: {
          Rest();
+         break;
+      }
+      case SStateData::STATE_RESTING_NEAR_FOOD: {
+         RestNearFood();
          break;
       }
       case SStateData::STATE_EXPLORING: {
@@ -195,8 +205,18 @@ void CForagingNNController::Reset() {
 void CForagingNNController::UpdateState() {
    /* Reset state flags */
    m_sStateData.InNest = false;
+   // CVector2 robotPosition(GetPosition().GetX(), GetPosition().GetY());
+
+   // Check if inside nest radius
+   if(loopFunctions) {
+      if((GetPosition() - loopFunctions->NestPosition).SquareLength() < (loopFunctions->NestRadius * loopFunctions->NestRadius)) {
+         m_sStateData.InNest = true;
+      }
+   } else {
+      LOG << "Loop function not found!" << std::endl;
+   }
    /* Read stuff from the ground sensor */
-   const CCI_FootBotMotorGroundSensor::TReadings& tGroundReads = m_pcGround->GetReadings();
+   // const CCI_FootBotMotorGroundSensor::TReadings& tGroundReads = m_pcGround->GetReadings();
    /*
     * You can say whether you are in the nest by checking the ground sensor
     * placed close to the wheel motors. It returns a value between 0 and 1.
@@ -209,19 +229,13 @@ void CForagingNNController::UpdateState() {
     * (readings 2 and 3) to tell us whether we are on gray: if so, the
     * robot is completely in the nest, otherwise it's outside.
     */
-   LOG << GetId() << " " << tGroundReads[2].Value << " " << tGroundReads[3].Value << std::endl;
-   if(tGroundReads[2].Value > 0.25f &&
-      tGroundReads[2].Value < 0.75f &&
-      tGroundReads[3].Value > 0.25f &&
-      tGroundReads[3].Value < 0.75f) {
-      m_sStateData.InNest = true;
-   }
-   if(m_sStateData.InNest) {
-      LOG << GetId() << " " << "in nest" << std::endl;
-   }
-   else {
-      LOG << GetId() << " " << "outside nest" << std::endl;
-   }
+   // LOG << GetId() << " " << tGroundReads[2].Value << " " << tGroundReads[3].Value << std::endl;
+   // if(tGroundReads[2].Value > 0.25f &&
+   //    tGroundReads[2].Value < 0.75f &&
+   //    tGroundReads[3].Value > 0.25f &&
+   //    tGroundReads[3].Value < 0.75f) {
+   //    m_sStateData.InNest = true;
+   // }
 }
 
 /****************************************/
@@ -353,41 +367,66 @@ void CForagingNNController::SetWheelSpeedsFromVector(const CVector2& c_heading) 
 void CForagingNNController::Rest() {
    /* If we have stayed here enough, probabilistically switch to
     * 'exploring' */
-   if(m_sStateData.TimeRested > m_sStateData.MinimumRestingTime &&
-      m_pcRNG->Uniform(m_sStateData.ProbRange) < m_sStateData.RestToExploreProb) {
+   if(m_sStateData.TimeRested > m_sStateData.MinimumRestingTime) {
       m_pcLEDs->SetAllColors(CColor::GREEN);
       m_sStateData.State = SStateData::STATE_EXPLORING;
       m_sStateData.TimeRested = 0;
-   }
-   else {
+   } else {
+      LOG << GetId() << " is resting...will start in " << (50 - m_sStateData.TimeRested) << std::endl;
+      m_pcWheels->SetLinearVelocity(0.0f, 0.0f);
       ++m_sStateData.TimeRested;
-      /* Be sure not to send the last exploration result multiple times */
-      if(m_sStateData.TimeRested == 1) {
-         m_pcRABA->SetData(0, LAST_EXPLORATION_NONE);
-      }
-      /*
-       * Social rule: listen to what other people have found and modify
-       * probabilities accordingly
-       */
-      const CCI_RangeAndBearingSensor::TReadings& tPackets = m_pcRABS->GetReadings();
-      for(size_t i = 0; i < tPackets.size(); ++i) {
-         switch(tPackets[i].Data[0]) {
-            case LAST_EXPLORATION_SUCCESSFUL: {
-               m_sStateData.RestToExploreProb += m_sStateData.SocialRuleRestToExploreDeltaProb;
-               m_sStateData.ProbRange.TruncValue(m_sStateData.RestToExploreProb);
-               m_sStateData.ExploreToRestProb -= m_sStateData.SocialRuleExploreToRestDeltaProb;
-               m_sStateData.ProbRange.TruncValue(m_sStateData.ExploreToRestProb);
-               break;
-            }
-            case LAST_EXPLORATION_UNSUCCESSFUL: {
-               m_sStateData.ExploreToRestProb += m_sStateData.SocialRuleExploreToRestDeltaProb;
-               m_sStateData.ProbRange.TruncValue(m_sStateData.ExploreToRestProb);
-               m_sStateData.RestToExploreProb -= m_sStateData.SocialRuleRestToExploreDeltaProb;
-               m_sStateData.ProbRange.TruncValue(m_sStateData.RestToExploreProb);
-               break;
-            }
-         }
-      }
+   }
+   // if(m_sStateData.TimeRested > m_sStateData.MinimumRestingTime &&
+   //    m_pcRNG->Uniform(m_sStateData.ProbRange) < m_sStateData.RestToExploreProb) {
+   //    m_pcLEDs->SetAllColors(CColor::GREEN);
+   //    m_sStateData.State = SStateData::STATE_EXPLORING;
+   //    m_sStateData.TimeRested = 0;
+   // }
+   // else {
+   //    ++m_sStateData.TimeRested;
+   //    /* Be sure not to send the last exploration result multiple times */
+   //    if(m_sStateData.TimeRested == 1) {
+   //       m_pcRABA->SetData(0, LAST_EXPLORATION_NONE);
+   //    }
+   //    /*
+   //     * Social rule: listen to what other people have found and modify
+   //     * probabilities accordingly
+   //     */
+   //    const CCI_RangeAndBearingSensor::TReadings& tPackets = m_pcRABS->GetReadings();
+   //    for(size_t i = 0; i < tPackets.size(); ++i) {
+   //       switch(tPackets[i].Data[0]) {
+   //          case LAST_EXPLORATION_SUCCESSFUL: {
+   //             m_sStateData.RestToExploreProb += m_sStateData.SocialRuleRestToExploreDeltaProb;
+   //             m_sStateData.ProbRange.TruncValue(m_sStateData.RestToExploreProb);
+   //             m_sStateData.ExploreToRestProb -= m_sStateData.SocialRuleExploreToRestDeltaProb;
+   //             m_sStateData.ProbRange.TruncValue(m_sStateData.ExploreToRestProb);
+   //             break;
+   //          }
+   //          case LAST_EXPLORATION_UNSUCCESSFUL: {
+   //             m_sStateData.ExploreToRestProb += m_sStateData.SocialRuleExploreToRestDeltaProb;
+   //             m_sStateData.ProbRange.TruncValue(m_sStateData.ExploreToRestProb);
+   //             m_sStateData.RestToExploreProb -= m_sStateData.SocialRuleRestToExploreDeltaProb;
+   //             m_sStateData.ProbRange.TruncValue(m_sStateData.RestToExploreProb);
+   //             break;
+   //          }
+   //       }
+   //    }
+   // }
+}
+
+void CForagingNNController::RestNearFood() {
+   /* If we have stayed here enough, probabilistically switch to
+    * 'exploring' */
+   if(m_sStateData.TimeRestedNearFood > m_sStateData.MinimumRestingTimeNearFood){
+      m_sStateData.TimeRestedNearFood = 0;
+      m_pcLEDs->SetAllColors(CColor::BLUE);
+      m_sStateData.State = SStateData::STATE_RETURN_TO_NEST;
+   } else {
+      // m_sStateData.State = SStateData::STATE_RESTING;
+      ++m_sStateData.TimeRestedNearFood;
+      m_pcLEDs->SetAllColors(CColor::YELLOW);
+      m_pcWheels->SetLinearVelocity(0.0f, 0.0f);
+      // LOG << GetId() << "is waiting for others to come...will return in " << (100 - m_sStateData.TimeRestedNearFood) << std::endl;
    }
 }
 
@@ -400,6 +439,7 @@ void CForagingNNController::Explore() {
     * 2. if we have not found a food item for some time;
     *    in this case, the switch is probabilistic
     */
+   // layPheromone();
    bool bReturnToNest(false);
    /*
     * Test the first condition: have we found a food item?
@@ -407,44 +447,8 @@ void CForagingNNController::Explore() {
     * here we just need to read it
     */
    if(m_sFoodData.HasFoodItem) {
-      /* Apply the food rule, decreasing ExploreToRestProb and increasing
-       * RestToExploreProb */
-      m_sStateData.ExploreToRestProb -= m_sStateData.FoodRuleExploreToRestDeltaProb;
-      m_sStateData.ProbRange.TruncValue(m_sStateData.ExploreToRestProb);
-      m_sStateData.RestToExploreProb += m_sStateData.FoodRuleRestToExploreDeltaProb;
-      m_sStateData.ProbRange.TruncValue(m_sStateData.RestToExploreProb);
-      /* Store the result of the expedition */
-      m_eLastExplorationResult = LAST_EXPLORATION_SUCCESSFUL;
-      /* Switch to 'return to nest' */
-      bReturnToNest = true;
-   }
-   /* Test the second condition: we probabilistically switch to 'return to
-    * nest' if we have been wandering for some time and found nothing */
-   // else if(m_sStateData.TimeExploringUnsuccessfully > m_sStateData.MinimumUnsuccessfulExploreTime) {
-   //    if (m_pcRNG->Uniform(m_sStateData.ProbRange) < m_sStateData.ExploreToRestProb) {
-   //       /* Store the result of the expedition */
-   //       m_eLastExplorationResult = LAST_EXPLORATION_UNSUCCESSFUL;
-   //       /* Switch to 'return to nest' */
-   //       bReturnToNest = true;
-   //    }
-   //    else {
-   //       /* Apply the food rule, increasing ExploreToRestProb and
-   //        * decreasing RestToExploreProb */
-   //       m_sStateData.ExploreToRestProb += m_sStateData.FoodRuleExploreToRestDeltaProb;
-   //       m_sStateData.ProbRange.TruncValue(m_sStateData.ExploreToRestProb);
-   //       m_sStateData.RestToExploreProb -= m_sStateData.FoodRuleRestToExploreDeltaProb;
-   //       m_sStateData.ProbRange.TruncValue(m_sStateData.RestToExploreProb);
-   //    }
-   // }
-   /* So, do we return to the nest now? */
-   if(bReturnToNest) {
-      /* Yes, we do! */
-      m_sStateData.TimeExploringUnsuccessfully = 0;
-      m_sStateData.TimeSearchingForPlaceInNest = 0;
-      m_pcLEDs->SetAllColors(CColor::BLUE);
-      m_sStateData.State = SStateData::STATE_RETURN_TO_NEST;
-   }
-   else {
+      m_sStateData.State = SStateData::STATE_RESTING_NEAR_FOOD;
+   } else {
       /* No, perform the actual exploration */
       ++m_sStateData.TimeExploringUnsuccessfully;
       UpdateState();
@@ -510,7 +514,7 @@ void CForagingNNController::ReturnToNest() {
       //    ++m_sStateData.TimeSearchingForPlaceInNest;
       // }
       LOG << GetId() << " returned to nest" << std::endl;
-      m_sStateData.State = SStateData::STATE_EXPLORING;
+      m_sStateData.State = SStateData::STATE_RESTING;
    }
    else {
       /* Still outside the nest */
@@ -522,6 +526,23 @@ void CForagingNNController::ReturnToNest() {
    SetWheelSpeedsFromVector(
       m_sWheelTurningParams.MaxSpeed * DiffusionVector(bCollision) +
       m_sWheelTurningParams.MaxSpeed * CalculateVectorToLight());
+}
+
+void CForagingNNController::layPheromone() {
+   Real timeInSeconds = (Real)(loopFunctions->SimTime / 10);
+   for(int i = 0; i < loopFunctions->Pheromones.size(); i++) {
+      if (loopFunctions->Pheromones[i].IsActive()) {
+         loopFunctions->Pheromones[i].Reset(timeInSeconds);
+      }
+   }
+   
+}
+
+CVector2 CForagingNNController::GetPosition() {
+   /* The robot's compass sensor gives us a 3D position. */
+   CVector3 position3D = compass->GetReading().Position;
+   /* Return the 2D position components of the compass sensor reading. */
+   return CVector2(position3D.GetX(), position3D.GetY());
 }
 
 /****************************************/
