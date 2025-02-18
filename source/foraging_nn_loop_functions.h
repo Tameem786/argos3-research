@@ -52,6 +52,8 @@ public:
    void SetInitialFoodPositions();
    void UpdatePheromoneList();
    size_t SimTime;
+   size_t TickPerSecond;
+   UInt32 unFoodItems;
 protected:
    vector<CColor> FoodColoringList;
 

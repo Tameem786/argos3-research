@@ -49,9 +49,21 @@ void CForagingNNQTUserFunctions::DrawOnRobot(CFootBotEntity& entity) {
    }
 }
 
+void CForagingNNQTUserFunctions::DrawPheromones() {
+    Real x, y;
+    for(size_t i = 0; i < loopFunctions.Pheromones.size(); i++) {
+        if (loopFunctions.Pheromones[i].IsActive()) {
+            x = loopFunctions.Pheromones[i].GetLocation().GetX();
+            y = loopFunctions.Pheromones[i].GetLocation().GetY();
+            DrawCylinder(CVector3(x, y, 0.0), CQuaternion(), 0.05, 0.025, CColor::GREEN);
+        }
+    }
+}
+
 void CForagingNNQTUserFunctions::DrawInWorld() {
    DrawFood();
    DrawNest();
+   DrawPheromones();
 }
 
 void CForagingNNQTUserFunctions::DrawFood() {

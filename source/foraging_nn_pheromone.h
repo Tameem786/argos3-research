@@ -23,6 +23,7 @@ class foraging_nn_pheromone {
 		CVector2         GetLocation();
 		Real             GetWeight();
         bool             IsActive();
+		bool 		     IsAttractive();
 	    void             Reset(Real time);
 
 	private:

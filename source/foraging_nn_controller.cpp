@@ -159,7 +159,6 @@ void CForagingNNController::Init(TConfigurationNode& t_node) {
 /****************************************/
 
 void CForagingNNController::ControlStep() {
-   LOG << GetId() << " Position: " << GetPosition() << std::endl;
    switch(m_sStateData.State) {
       case SStateData::STATE_RESTING: {
          Rest();
@@ -367,12 +366,13 @@ void CForagingNNController::SetWheelSpeedsFromVector(const CVector2& c_heading) 
 void CForagingNNController::Rest() {
    /* If we have stayed here enough, probabilistically switch to
     * 'exploring' */
+   m_pcRABA->SetData(0, 0);
    if(m_sStateData.TimeRested > m_sStateData.MinimumRestingTime) {
       m_pcLEDs->SetAllColors(CColor::GREEN);
       m_sStateData.State = SStateData::STATE_EXPLORING;
       m_sStateData.TimeRested = 0;
    } else {
-      LOG << GetId() << " is resting...will start in " << (50 - m_sStateData.TimeRested) << std::endl;
+      // LOG << GetId() << " is resting...will start in " << (50 - m_sStateData.TimeRested) << std::endl;
       m_pcWheels->SetLinearVelocity(0.0f, 0.0f);
       ++m_sStateData.TimeRested;
    }
@@ -424,6 +424,15 @@ void CForagingNNController::RestNearFood() {
    } else {
       // m_sStateData.State = SStateData::STATE_RESTING;
       ++m_sStateData.TimeRestedNearFood;
+      uint8_t i = 0;
+      if(GetId() == "fb1") { i = 1 ;}
+      else if(GetId() == "fb2") { i = 2 ;}
+      else if(GetId() == "fb3") { i = 3 ;}
+      else if(GetId() == "fb4") { i = 4 ;}
+      else if(GetId() == "fb5") { i = 5 ;}
+      else if(GetId() == "fb6") { i = 6 ;}
+      else { i = 0; }
+      m_pcRABA->SetData(0, i);
       m_pcLEDs->SetAllColors(CColor::YELLOW);
       m_pcWheels->SetLinearVelocity(0.0f, 0.0f);
       // LOG << GetId() << "is waiting for others to come...will return in " << (100 - m_sStateData.TimeRestedNearFood) << std::endl;
@@ -439,7 +448,32 @@ void CForagingNNController::Explore() {
     * 2. if we have not found a food item for some time;
     *    in this case, the switch is probabilistic
     */
-   // layPheromone();
+   const CCI_RangeAndBearingSensor::TReadings& tPackets = m_pcRABS->GetReadings();
+   for(size_t i = 0; i < tPackets.size(); ++i) {
+      switch(tPackets[i].Data[0]) {
+         case 1: {
+            LOG << GetId() << " said fb1 found a food!" << endl;
+            break;
+         }
+         case 2: {
+            LOG << GetId() << " said fb2 found a food!" << endl;
+            break;
+         }
+         case 3: {
+            LOG << GetId() << " said fb3 found a food!" << endl;
+            break;
+         }
+         case 4: {
+            LOG << GetId() << " said fb4 found a food!" << endl;
+            break;
+         }
+         case 5: {
+            LOG << GetId() << " said fb5 found a food!" << endl;
+            break;
+         }
+      }
+   }
+
    bool bReturnToNest(false);
    /*
     * Test the first condition: have we found a food item?
@@ -493,7 +527,8 @@ void CForagingNNController::Explore() {
 void CForagingNNController::ReturnToNest() {
    /* As soon as you get to the nest, switch to 'resting' */
    UpdateState();
-   LOG << GetId() << " returning to nest" << std::endl;
+   layPheromone();
+   // LOG << GetId() << " returning to nest" << std::endl;
    /* Are we in the nest? */
    if(m_sStateData.InNest) {
       /* Have we looked for a place long enough? */
@@ -513,13 +548,13 @@ void CForagingNNController::ReturnToNest() {
       //    /* No, keep looking */
       //    ++m_sStateData.TimeSearchingForPlaceInNest;
       // }
-      LOG << GetId() << " returned to nest" << std::endl;
+      // LOG << GetId() << " returned to nest" << std::endl;
       m_sStateData.State = SStateData::STATE_RESTING;
    }
    else {
       /* Still outside the nest */
       m_sStateData.TimeSearchingForPlaceInNest = 0;
-      LOG << GetId() << " still outside the nest" << std::endl;
+      // LOG << GetId() << " still outside the nest" << std::endl;
    }
    /* Keep going */
    bool bCollision;
@@ -529,13 +564,28 @@ void CForagingNNController::ReturnToNest() {
 }
 
 void CForagingNNController::layPheromone() {
-   Real timeInSeconds = (Real)(loopFunctions->SimTime / 10);
-   for(int i = 0; i < loopFunctions->Pheromones.size(); i++) {
-      if (loopFunctions->Pheromones[i].IsActive()) {
+   Real timeInSeconds = (Real)(loopFunctions->SimTime / loopFunctions->TickPerSecond);
+   if (!IsNearPheromone()) {
+      foraging_nn_pheromone sharedPheromone(GetPosition(), timeInSeconds, 0.1f);
+      loopFunctions->Pheromones.push_back(sharedPheromone);
+    }
+    else{
+      // LOG << GetId() << " is near pheromone." << endl;
+      for(int i = 0; i < loopFunctions->Pheromones.size(); i++) {
+         // if (loopFunctions->Pheromones[i].IsActive() && ((GetPosition() - loopFunctions->Pheromones[i].GetLocation()).SquareLength() < (loopFunctions->FoodRadius*loopFunctions->FoodRadius))) {
+         // }
          loopFunctions->Pheromones[i].Reset(timeInSeconds);
       }
-   }
-   
+    }
+}
+
+bool CForagingNNController::IsNearPheromone() {
+    for(int i = 0; i < loopFunctions->Pheromones.size(); i++) {
+        if (loopFunctions->Pheromones[i].IsActive() && ((GetPosition() - loopFunctions->Pheromones[i].GetLocation()).SquareLength() < (loopFunctions->FoodRadius*loopFunctions->FoodRadius))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 CVector2 CForagingNNController::GetPosition() {

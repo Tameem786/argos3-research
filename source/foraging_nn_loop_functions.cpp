@@ -14,6 +14,8 @@ CForagingNNLoopFunctions::CForagingNNLoopFunctions() :
    m_pcRNG(NULL),
    m_unCollectedFood(0),
    SimTime(0),
+   TickPerSecond(0),
+   unFoodItems(0),
    m_nEnergy(0),
    m_unEnergyPerFoodItem(1),
    m_unEnergyPerWalkingRobot(1) {
@@ -24,19 +26,26 @@ CForagingNNLoopFunctions::CForagingNNLoopFunctions() :
 
 void CForagingNNLoopFunctions::Init(TConfigurationNode& t_node) {
    try {
+      CSimulator     *simulator     = &GetSimulator();
+      CPhysicsEngine *physicsEngine = &simulator->GetPhysicsEngine("default");
+      CVector3        ArenaSize     = GetSpace().GetArenaSize();
+      CVector2        rangeX        = CVector2(-ArenaSize.GetX()/2.0, ArenaSize.GetX()/2.0);
+      CVector2        rangeY        = CVector2(-ArenaSize.GetY()/2.0, ArenaSize.GetY()/2.0);
       TConfigurationNode& tForaging = GetNode(t_node, "foraging");
+
+      TickPerSecond            = physicsEngine->GetInverseSimulationClockTick();
       /* Get a pointer to the floor entity */
       m_pcFloor = &GetSpace().GetFloorEntity();
       /* Get the number of food items we want to be scattered from XML */
-      UInt32 unFoodItems;
+      // UInt32 unFoodItems;
       GetNodeAttribute(tForaging, "items", unFoodItems);
       /* Get the number of food items we want to be scattered from XML */
       GetNodeAttribute(tForaging, "radius", m_fFoodSquareRadius);
       m_fFoodSquareRadius *= m_fFoodSquareRadius;
       /* Create a new RNG */
       m_pcRNG = CRandom::CreateRNG("argos");
-      m_cForagingArenaSideX.Set(-1.5f, 1.5f);
-      m_cForagingArenaSideY.Set(-1.5f, 1.5f);
+      m_cForagingArenaSideX.Set(rangeX.GetX() + (2.0 * FoodRadius), rangeX.GetY() - (2.0 * FoodRadius));
+      m_cForagingArenaSideY.Set(rangeY.GetX() + (2.0 * FoodRadius), rangeY.GetY() - (2.0 * FoodRadius));
       /* Distribute uniformly the items in the environment */
       // for(UInt32 i = 0; i < unFoodItems; ++i) {
       //    m_cFoodPos.push_back(
@@ -59,9 +68,11 @@ void CForagingNNLoopFunctions::Init(TConfigurationNode& t_node) {
    }
 
    NestPosition = CVector2(0.0f, 0.0f);
-   NestRadius = 0.35f;
+   NestRadius = 0.5f;
    FoodRadius = 0.1f;
    isFoodCollected = false;
+
+   
 
    CSpace::TMapPerType& footbots = GetSpace().GetEntitiesByType("foot-bot");
    CSpace::TMapPerType::iterator it;
@@ -78,7 +89,7 @@ void CForagingNNLoopFunctions::Init(TConfigurationNode& t_node) {
 
 void CForagingNNLoopFunctions::SetInitialFoodPositions() {
    FoodList.clear();
-   for(size_t i = 0; i < 5; i++) {
+   for(size_t i = 0; i < unFoodItems; i++) {
       CVector2 cPos;
       bool validPos = false;
       do {
@@ -116,19 +127,19 @@ void CForagingNNLoopFunctions::Reset() {
    //                      m_pcRNG->Uniform(m_cForagingArenaSideY));
    // }
    isFoodCollected = false;
-   // Pheromones.clear();
+   Pheromones.clear();
    SetInitialFoodPositions();
 }
 
 void CForagingNNLoopFunctions::UpdatePheromoneList() {
  
-   //LOG << "Hello, world! " << PheromoneList.size() << endl << endl;
+   // LOG << "Hello, world! " << Pheromones.size() << endl << endl;
 
    vector<foraging_nn_pheromone> new_p_list;
 
    for(size_t i = 0; i < Pheromones.size(); i++) {
 
-       Pheromones[i].Update((Real)(SimTime / 10));
+       Pheromones[i].Update((Real)(SimTime / TickPerSecond));
 
        //if(PheromoneList[i].IsActive()) LOG << "O" << endl;
        //else LOG << "X" << endl;
@@ -172,7 +183,7 @@ void CForagingNNLoopFunctions::PreStep() {
     * Each robot can carry only one food item per time
     */
    SimTime++;
-   // UpdatePheromoneList();
+   UpdatePheromoneList();
 
    UInt32 unWalkingFBs = 0;
    UInt32 unRestingFBs = 0;
@@ -204,7 +215,7 @@ void CForagingNNLoopFunctions::PreStep() {
                   break;
             }
          } 
-         m_pcFloor->SetChanged();
+         // m_pcFloor->SetChanged();
       } 
       // Handle food drop
       if(sFoodData.HasFoodItem) {
@@ -213,7 +224,7 @@ void CForagingNNLoopFunctions::PreStep() {
             sFoodData.FoodItemIdx = 0;
             sFoodData.TotalFoodItems++;
             ++m_unCollectedFood;
-            m_pcFloor->SetChanged();
+            // m_pcFloor->SetChanged();
             // SetFoodPosition();
             // isFoodCollected = false;
          }

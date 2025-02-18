@@ -127,7 +127,8 @@
           STATE_RESTING = 0,
           STATE_EXPLORING,
           STATE_RETURN_TO_NEST,
-          STATE_RESTING_NEAR_FOOD
+          STATE_RESTING_NEAR_FOOD,
+          STATE_MOVING_TO_FOOD
        } State;
  
        /* True when the robot is in the nest */
@@ -250,6 +251,8 @@
        return m_sFoodData;
     }
 
+    CVector2 GetPosition();
+
     inline CCI_RangeAndBearingActuator* GetRABA() {
       return m_pcRABA;
     }
@@ -307,7 +310,7 @@
 
     void layPheromone();
 
-    CVector2 GetPosition();
+    bool IsNearPheromone();
  
  private:
  

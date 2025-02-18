@@ -28,8 +28,10 @@ private:
 
    void DrawNest();
    void DrawFood();
+   void DrawPheromones();
    
    CForagingNNLoopFunctions& loopFunctions;
+   // CForagingNNController& controller;
 };
 
 #endif

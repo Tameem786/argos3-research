@@ -115,7 +115,7 @@
   </controllers>
   <loop_functions library="build/source/libforaging_nn_loop_functions"
                   label="foraging_nn_loop_functions">
-    <foraging items="15"
+    <foraging items="50"
               radius="0.1"
               energy_per_item="1000"
               energy_per_walking_robot="1"
@@ -140,22 +140,22 @@
  
       $ argos3 -q box
   -->
-  <arena size="5, 5, 2" center="0,0,1">
+  <arena size="10, 10, 1" center="0,0,0.5">
     <floor id="floor"
            source="loop_functions"
            pixels_per_meter="50" />
     <!-- Place four boxes in a square to delimit the arena -->
-    <box id="wall_north" size="5,0.1,0.5" movable="false">
-      <body position="0,2.5,0" orientation="0,0,0" />
+    <box id="wall_north" size="10,0.1,1" movable="false">
+      <body position="0,5,0" orientation="0,0,0" />
     </box>
-    <box id="wall_south" size="5,0.1,0.5" movable="false">
-      <body position="0,-2.5,0" orientation="0,0,0" />
+    <box id="wall_south" size="10,0.1,1" movable="false">
+      <body position="0,-5,0" orientation="0,0,0" />
     </box>
-    <box id="wall_east" size="0.1,5,0.5" movable="false">
-      <body position="2.5,0,0" orientation="0,0,0" />
+    <box id="wall_east" size="0.1,10,1" movable="false">
+      <body position="5,0,0" orientation="0,0,0" />
     </box>
-    <box id="wall_west" size="0.1,5,0.5" movable="false">
-      <body position="-2.5,0,0" orientation="0,0,0" />
+    <box id="wall_west" size="0.1,10,1" movable="false">
+      <body position="-5,0,0" orientation="0,0,0" />
     </box>
  
     <light id="light_0"
@@ -184,9 +184,10 @@
            medium="leds" /> -->
 
     <distribute>
-      <position method="uniform" min="-0.2,-0.2,0" max="0.2,0.2,0" />
-      <orientation method="uniform" min="0,0,0" max="360,0,0" />
-      <entity quantity="2" max_trials="100">
+      <!-- <position method="uniform" min="-0.5,-0.5,0" max="0.5,0.5,0" /> -->
+      <position method="grid" center="0,0,0" distances="0.2,0.2,0" layout="3,3,1" />
+      <orientation method="constant" values="0,0,0" />
+      <entity quantity="6" max_trials="10">
         <foot-bot id="fb">
           <controller config="ffc" />
         </foot-bot>
@@ -246,7 +247,7 @@
     <qt-opengl>
       <camera>
         <placements>
-          <placement index="0" position="0,0,4.34" look_at="0,0,0" up="1,0,0" lens_focal_length="20" />
+          <placement index="0" position="0,0,8.5" look_at="0,0,0" up="1,0,0" lens_focal_length="20" />
         </placements>
       </camera>
       <user_functions label="foraging_nn_qt_user_functions" />
